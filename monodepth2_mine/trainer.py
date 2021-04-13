@@ -15,6 +15,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
+
 import json
 
 from utils import *
@@ -41,11 +42,12 @@ class Trainer:
         self.parameters_to_train = []
         # FLAGS = parser.parse_args()
         # local_rank = FLAGS.local_rank
-        torch.cuda.set_device(self.opt.local_rank)
-        torch.distributed.init_process_group(backend="nccl")
-        self.device = torch.device("cuda", self.opt.local_rank)
-
-        #self.device = torch.device("cpu" if self.opt.no_cuda else "cuda")
+        if self.opt.distributed:
+            torch.cuda.set_device(self.opt.local_rank)
+            torch.distributed.init_process_group(backend="nccl")
+            self.device = torch.device("cuda", self.opt.local_rank)
+        else:
+            self.device = torch.device("cpu" if self.opt.no_cuda else "cuda")
 
         self.num_scales = len(self.opt.scales)
         self.num_input_frames = len(self.opt.frame_ids)
@@ -62,9 +64,18 @@ class Trainer:
             self.opt.num_layers, self.opt.weights_init == "pretrained")
         self.models["encoder"].to(self.device)
         # added for GPUs
-        self.models_GPUs["encoder"] = torch.nn.parallel.DistributedDataParallel(self.models["encoder"],
-                                                    device_ids =[self.opt.local_rank], output_device=self.opt.local_rank)
-        self.parameters_to_train += list(self.models_GPUs["encoder"].parameters())
+        # self.models_GPUs["encoder"] = torch.nn.parallel.DistributedDataParallel(self.models["encoder"],
+        #                                             device_ids =[self.opt.local_rank], output_device=self.opt.local_rank,
+        #                                                              broadcast_buffers=False,find_unused_parameters=True)
+        if self.opt.distributed:
+            self.models_GPUs["encoder"] = torch.nn.parallel.DistributedDataParallel(self.models["encoder"],
+                                                                                device_ids=[self.opt.local_rank],
+                                                                                broadcast_buffers=False,
+                                                                                find_unused_parameters=True)
+        if self.opt.distributed:
+            self.parameters_to_train += list(self.models_GPUs["encoder"].parameters())
+        else:
+            self.parameters_to_train += list(self.models["encoder"].parameters())
 
         # self.models["depth"] = networks.DepthDecoder(
         #     self.models["encoder"].num_ch_enc, self.opt.scales)
@@ -72,9 +83,19 @@ class Trainer:
             self.models["encoder"].num_ch_enc, self.opt.scales)
         self.models["depth"].to(self.device)
         # added for GPUs
-        self.models_GPUs["depth"] = torch.nn.parallel.DistributedDataParallel(self.models["depth"], device_ids=[self.opt.local_rank],
-                                                                                                    output_device=self.opt.local_rank)
-        self.parameters_to_train += list(self.models_GPUs["depth"].parameters())
+        # self.models_GPUs["depth"] = torch.nn.parallel.DistributedDataParallel(self.models["depth"], device_ids=[self.opt.local_rank],
+        #                                                                                             output_device=self.opt.local_rank,
+        #                                                                       broadcast_buffers=False,find_unused_parameters=True)
+        if self.opt.distributed:
+            self.models_GPUs["depth"] = torch.nn.parallel.DistributedDataParallel(self.models["depth"],
+                                                                              device_ids=[self.opt.local_rank],
+                                                                              broadcast_buffers=False,
+                                                                              find_unused_parameters=True)
+
+        if self.opt.distributed:
+            self.parameters_to_train += list(self.models_GPUs["depth"].parameters())
+        else:
+            self.parameters_to_train += list(self.models["depth"].parameters())
 
         if self.use_pose_net:
             if self.opt.pose_model_type == "separate_resnet":
@@ -84,9 +105,19 @@ class Trainer:
                     num_input_images=self.num_pose_frames)
 
                 self.models["pose_encoder"].to(self.device)
-                self.models_GPUs["pose_encoder"] = torch.nn.parallel.DistributedDataParallel(self.models["pose_encoder"],
-                                                    device_ids=[self.opt.local_rank], output_device=self.opt.local_rank)
-                self.parameters_to_train += list(self.models_GPUs["pose_encoder"].parameters())
+                # self.models_GPUs["pose_encoder"] = torch.nn.parallel.DistributedDataParallel(self.models["pose_encoder"],
+                #                                     device_ids=[self.opt.local_rank], output_device=self.opt.local_rank,
+                #                                                     broadcast_buffers=False,find_unused_parameters=True)
+                if self.opt.distributed:
+                    self.models_GPUs["pose_encoder"] = torch.nn.parallel.DistributedDataParallel(
+                    self.models["pose_encoder"],
+                    device_ids=[self.opt.local_rank],
+                    broadcast_buffers=False, find_unused_parameters=True)
+
+                if self.opt.distributed:
+                    self.parameters_to_train += list(self.models_GPUs["pose_encoder"].parameters())
+                else:
+                    self.parameters_to_train += list(self.models["pose_encoder"].parameters())
                 self.models["pose"] = networks.PoseDecoder(
                     self.models["pose_encoder"].num_ch_enc,
                     num_input_features = 1,
@@ -102,10 +133,21 @@ class Trainer:
                     self.num_input_frames if self.opt.pose_model_input == "all" else 2)
 
             self.models["pose"].to(self.device)
-            self.models_GPUs["pose"] = torch.nn.parallel.DistributedDataParallel(self.models["pose"],
-                                                                device_ids=[self.opt.local_rank],
-                                                                output_device=self.opt.local_rank)
-            self.parameters_to_train += list(self.models_GPUs["pose"].parameters())
+            # self.models_GPUs["pose"] = torch.nn.parallel.DistributedDataParallel(self.models["pose"],
+            #                                                     device_ids=[self.opt.local_rank],
+            #                                                     output_device=self.opt.local_rank,
+            #                                      broadcast_buffers=False,find_unused_parameters=True)
+            if self.opt.distributed:
+                self.models_GPUs["pose"] = torch.nn.parallel.DistributedDataParallel(self.models["pose"],
+                                                                                 device_ids=[self.opt.local_rank],
+                                                                                 broadcast_buffers=False,
+                                                                                 find_unused_parameters=True)
+
+            if self.opt.distributed:
+                self.parameters_to_train += list(self.models_GPUs["pose"].parameters())
+            else:
+                self.parameters_to_train += list(self.models["pose"].parameters())
+
 
         if self.opt.predictive_mask:
             assert self.opt.disable_automasking, \
@@ -148,15 +190,19 @@ class Trainer:
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=True, img_ext=img_ext)
         # added for multiple GPUS
-        train_sampler = torch.distributed.DistributedSampler(train_dataset)
+        if self.opt.distributed:
+            train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        else:
+            train_sampler = None
+
         self.train_loader = DataLoader(
-            train_dataset, self.opt.batch_size, shuffle=False,
+            train_dataset, self.opt.batch_size, shuffle=(train_sampler is None),
             sampler=train_sampler, num_workers=self.opt.num_workers,pin_memory=True, drop_last=True)
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
         self.val_loader = DataLoader(
-            val_dataset, self.opt.batch_size, True,
+            val_dataset, self.opt.batch_size, shuffle=(train_sampler is None),
             num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
         self.val_iter = iter(self.val_loader)
 
@@ -169,37 +215,57 @@ class Trainer:
             self.ssim.to(self.device)
 
         self.backproject_depth = {}
+        # self.backproject_depth_GPUs = {}
         self.project_3d = {}
+        # self.project_3d_GPUs = {}
         for scale in self.opt.scales:
             h = self.opt.height // (2 ** scale)
             w = self.opt.width // (2 ** scale)
 
             self.backproject_depth[scale] = BackprojectDepth(self.opt.batch_size, h, w)
             self.backproject_depth[scale].to(self.device)
+            # self.backproject_depth_GPUs[scale] = torch.nn.parallel.DistributedDataParallel(self.backproject_depth[scale],
+            #                                                                      device_ids=[self.opt.local_rank],
+            #                                                                      output_device=self.opt.local_rank)
 
             self.project_3d[scale] = Project3D(self.opt.batch_size, h, w)
             self.project_3d[scale].to(self.device)
-
+            # self.project_3d_GPUs[scale] = torch.nn.parallel.DistributedDataParallel(
+            #     self.project_3d[scale],
+            #     device_ids=[self.opt.local_rank],
+            #     output_device=self.opt.local_rank)
         self.depth_metric_names = [
             "de/abs_rel", "de/sq_rel", "de/rms", "de/log_rms", "da/a1", "da/a2", "da/a3"]
 
         print("Using split:\n  ", self.opt.split)
-        print("There are {:d} training items and {:d} validation items\n".format(
-            len(train_dataset), len(val_dataset)))
+        if self.opt.distributed:
+            print("There are {:d} training items and {:d} validation items\n".format(
+                self.train_loader.__len__(), len(val_dataset)))
+        else:
+            print("There are {:d} training items and {:d} validation items\n".format(
+                len(train_dataset), len(val_dataset)))
 
         self.save_opts()
 
     def set_train(self):
         """Convert all models to training mode
         """
-        for m in self.models_GPUs.values():
-            m.train()
+        if self.opt.distributed:
+            for m in self.models_GPUs.values():
+                m.train()
+        else:
+            for m in self.models.values():
+                m.train()
 
     def set_eval(self):
         """Convert all models to testing/evaluation mode
         """
-        for m in self.models_GPUs.values():
-            m.eval()
+        if self.opt.distributed:
+            for m in self.models_GPUs.values():
+                m.eval()
+        else:
+            for m in self.models.values():
+                m.eval()
 
     def train(self):
         """Run the entire training pipeline
@@ -207,12 +273,18 @@ class Trainer:
         self.epoch = 0
         self.step = 0
         self.start_time = time.time()
-        for self.epoch in range(self.opt.num_epochs):
-            self.train_loader.sampler.set_epoch(self.epoch)
-            self.run_epoch()
-            # save the whole model after each epoch
-            if ((self.epoch + 1) % self.opt.save_frequency == 0 and torch.distributed.get_rank() == 0):
-                self.save_model()
+        with torch.autograd.set_detect_anomaly(True):
+            for self.epoch in range(self.opt.num_epochs):
+                if self.opt.distributed:
+                    self.train_loader.sampler.set_epoch(self.epoch)
+                self.run_epoch()
+                # save the whole model after each epoch
+                if ((self.epoch + 1) % self.opt.save_frequency == 0):
+                    if self.opt.distributed:
+                        if self.opt.local_rank == 0:
+                            self.save_model()
+                    else:
+                        self.save_model()
 
     def run_epoch(self):
         """Run a single epoch of training and validation
@@ -248,7 +320,7 @@ class Trainer:
                 self.log("train", inputs, outputs, losses)
                 self.val()
 
-            self.step += 1
+            self.step =self.step+1
         self.model_lr_scheduler.step()
 
     def process_batch(self, inputs):
@@ -261,18 +333,27 @@ class Trainer:
             # If we are using a shared encoder for both depth and pose (as advocated
             # in monodepthv1), then all images are fed separately through the depth encoder.
             all_color_aug = torch.cat([inputs[("color_aug", i, 0)] for i in self.opt.frame_ids])
-            all_features = self.models_GPUs["encoder"](all_color_aug)
+            if self.opt.distributed:
+                all_features = self.models_GPUs["encoder"](all_color_aug)
+            else:
+                all_features = self.models["encoder"](all_color_aug)
             all_features = [torch.split(f, self.opt.batch_size) for f in all_features]
 
             features = {}
             for i, k in enumerate(self.opt.frame_ids):
                 features[k] = [f[i] for f in all_features]
-
-            outputs = self.models_GPUs["depth"](features[0])
+            if self.opt.distributed:
+                outputs = self.models_GPUs["depth"](features[0])
+            else:
+                outputs = self.models["depth"](features[0])
         else:
             # Otherwise, we only feed the image with frame_id 0 through the depth encoder
-            features = self.models_GPUs["encoder"](inputs["color_aug", 0, 0])
-            outputs = self.models_GPUs["depth"](features)
+            if self.opt.distributed:
+                features = self.models_GPUs["encoder"](inputs["color_aug", 0, 0])
+                outputs = self.models_GPUs["depth"](features)
+            else:
+                features = self.models["encoder"](inputs["color_aug", 0, 0])
+                outputs = self.models["depth"](features)
 
         if self.opt.predictive_mask:
             outputs["predictive_mask"] = self.models["predictive_mask"](features)
@@ -308,11 +389,16 @@ class Trainer:
                         pose_inputs = [pose_feats[0], pose_feats[f_i]]
 
                     if self.opt.pose_model_type == "separate_resnet":
-                        pose_inputs = [self.models_GPUs["pose_encoder"](torch.cat(pose_inputs, 1))]
+                        if self.opt.distributed:
+                            pose_inputs = [self.models_GPUs["pose_encoder"](torch.cat(pose_inputs, 1))]
+                        else:
+                            pose_inputs = [self.models["pose_encoder"](torch.cat(pose_inputs, 1))]
                     elif self.opt.pose_model_type == "posecnn":
                         pose_inputs = torch.cat(pose_inputs, 1)
-
-                    axisangle, translation = self.models_GPUs["pose"](pose_inputs)
+                    if self.opt.distributed:
+                        axisangle, translation = self.models_GPUs["pose"](pose_inputs)
+                    else:
+                        axisangle, translation = self.models["pose"](pose_inputs)
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
 
@@ -327,12 +413,17 @@ class Trainer:
                     [inputs[("color_aug", i, 0)] for i in self.opt.frame_ids if i != "s"], 1)
 
                 if self.opt.pose_model_type == "separate_resnet":
-                    pose_inputs = [self.models_GPUs["pose_encoder"](pose_inputs)]
+                    if self.opt.distributed:
+                        pose_inputs = [self.models_GPUs["pose_encoder"](pose_inputs)]
+                    else:
+                        pose_inputs = [self.models["pose_encoder"](pose_inputs)]
 
             elif self.opt.pose_model_type == "shared":
                 pose_inputs = [features[i] for i in self.opt.frame_ids if i != "s"]
-
-            axisangle, translation = self.models_GPUs["pose"](pose_inputs)
+            if self.opt.distributed:
+                axisangle, translation = self.models_GPUs["pose"](pose_inputs)
+            else:
+                axisangle, translation = self.models["pose"](pose_inputs)
 
             for i, f_i in enumerate(self.opt.frame_ids[1:]):
                 if f_i != "s":
@@ -483,7 +574,7 @@ class Trainer:
 
                 # add a loss pushing mask to 1 (using nn.BCELoss for stability)
                 weighting_loss = 0.2 * nn.BCELoss()(mask, torch.ones(mask.shape).cuda())
-                loss += weighting_loss.mean()
+                loss = loss + weighting_loss.mean()
 
             if self.opt.avg_reprojection:
                 reprojection_loss = reprojection_losses.mean(1, keepdim=True)
@@ -492,7 +583,7 @@ class Trainer:
 
             if not self.opt.disable_automasking:
                 # add random numbers to break ties
-                identity_reprojection_loss += torch.randn(
+                identity_reprojection_loss = identity_reprojection_loss + torch.randn(
                     identity_reprojection_loss.shape).cuda() * 0.00001
 
                 combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
@@ -508,17 +599,17 @@ class Trainer:
                 outputs["identity_selection/{}".format(scale)] = (
                     idxs > identity_reprojection_loss.shape[1] - 1).float()
 
-            loss += to_optimise.mean()
+            loss = loss+to_optimise.mean()
 
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
             smooth_loss = get_smooth_loss(norm_disp, color)
 
-            loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
-            total_loss += loss
+            loss = loss+ self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
+            total_loss = loss + total_loss
             losses["loss/{}".format(scale)] = loss
 
-        total_loss /= self.num_scales
+        total_loss = total_loss / self.num_scales
         losses["loss"] = total_loss
         return losses
 
@@ -543,7 +634,8 @@ class Trainer:
 
         depth_gt = depth_gt[mask]
         depth_pred = depth_pred[mask]
-        depth_pred *= torch.median(depth_gt) / torch.median(depth_pred)
+        # use median scaling
+        depth_pred = depth_pred * torch.median(depth_gt) / torch.median(depth_pred)
 
         depth_pred = torch.clamp(depth_pred, min=1e-3, max=80)
 
@@ -615,17 +707,26 @@ class Trainer:
         save_folder = os.path.join(self.log_path, "models", "weights_{}".format(self.epoch))
         if not os.path.exists(save_folder):
             os.makedirs(save_folder)
-
-        for model_name, model in self.models_GPUs.items():
-            save_path = os.path.join(save_folder, "{}.pth".format(model_name))
-            to_save = model.module.state_dict()
-            if model_name == 'encoder':
-                # save the sizes - these are needed at prediction time
-                to_save['height'] = self.opt.height
-                to_save['width'] = self.opt.width
-                to_save['use_stereo'] = self.opt.use_stereo
-            torch.save(to_save, save_path)
-
+        if self.opt.distributed:
+            for model_name, model in self.models_GPUs.items():
+                save_path = os.path.join(save_folder, "{}.pth".format(model_name))
+                to_save = model.module.state_dict()
+                if model_name == 'encoder':
+                    # save the sizes - these are needed at prediction time
+                    to_save['height'] = self.opt.height
+                    to_save['width'] = self.opt.width
+                    to_save['use_stereo'] = self.opt.use_stereo
+                torch.save(to_save, save_path)
+        else:
+            for model_name, model in self.models.items():
+                save_path = os.path.join(save_folder, "{}.pth".format(model_name))
+                to_save = model.state_dict()
+                if model_name == 'encoder':
+                    # save the sizes - these are needed at prediction time
+                    to_save['height'] = self.opt.height
+                    to_save['width'] = self.opt.width
+                    to_save['use_stereo'] = self.opt.use_stereo
+                torch.save(to_save, save_path)
         save_path = os.path.join(save_folder, "{}.pth".format("adam"))
         torch.save(self.model_optimizer.state_dict(), save_path)
 
@@ -641,11 +742,17 @@ class Trainer:
         for n in self.opt.models_to_load:
             print("Loading {} weights...".format(n))
             path = os.path.join(self.opt.load_weights_folder, "{}.pth".format(n))
-            model_dict = self.models_GPUs[n].module.state_dict()
-            pretrained_dict = torch.load(path)
+            model_dict = self.models_GPUs[n].module.state_dict() if self.opt.distributed else self.models[n].state_dict()
+            pretrained_dict = torch.load(path,map_location=torch.device('cpu'))
             pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
             model_dict.update(pretrained_dict)
-            self.models_GPUs[n].module.load_state_dict(model_dict)
+            if self.opt.distributed:
+                self.models_GPUs[n].load_state_dict(model_dict)
+            else:
+                self.models[n].load_state_dict(model_dict)
+
+
+
 
         # loading adam state
         optimizer_load_path = os.path.join(self.opt.load_weights_folder, "adam.pth")

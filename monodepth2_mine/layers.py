@@ -33,7 +33,7 @@ def transformation_from_parameters(axisangle, translation, invert=False):
 
     if invert:
         R = R.transpose(1, 2)
-        t *= -1
+        t = t*-1
 
     T = get_translation_matrix(t)
 
@@ -188,8 +188,8 @@ class Project3D(nn.Module):
         pix_coords = cam_points[:, :2, :] / (cam_points[:, 2, :].unsqueeze(1) + self.eps)
         pix_coords = pix_coords.view(self.batch_size, 2, self.height, self.width)
         pix_coords = pix_coords.permute(0, 2, 3, 1)
-        pix_coords[..., 0] /= self.width - 1
-        pix_coords[..., 1] /= self.height - 1
+        pix_coords[..., 0] = pix_coords[..., 0]/(self.width - 1)
+        pix_coords[..., 1] = pix_coords[..., 1]/(self.height - 1)
         pix_coords = (pix_coords - 0.5) * 2
         return pix_coords
 
@@ -210,8 +210,8 @@ def get_smooth_loss(disp, img):
     grad_img_x = torch.mean(torch.abs(img[:, :, :, :-1] - img[:, :, :, 1:]), 1, keepdim=True)
     grad_img_y = torch.mean(torch.abs(img[:, :, :-1, :] - img[:, :, 1:, :]), 1, keepdim=True)
 
-    grad_disp_x *= torch.exp(-grad_img_x)
-    grad_disp_y *= torch.exp(-grad_img_y)
+    grad_disp_x = grad_disp_x*torch.exp(-grad_img_x)
+    grad_disp_y = grad_disp_y*torch.exp(-grad_img_y)
 
     return grad_disp_x.mean() + grad_disp_y.mean()
 
@@ -292,7 +292,7 @@ class fSEModule(nn.Module):
 
     def forward(self, high_features, low_features):
         features = [upsample(high_features)]
-        features += low_features
+        features = features+low_features
         features = torch.cat(features, 1)
 
         b, c, _, _ = features.size()

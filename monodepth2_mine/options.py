@@ -88,7 +88,7 @@ class MonodepthOptions:
         self.parser.add_argument("--batch_size",
                                  type=int,
                                  help="batch size",
-                                 default=48)
+                                 default=10)
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",
@@ -141,8 +141,8 @@ class MonodepthOptions:
         self.parser.add_argument("--num_workers",
                                  type=int,
                                  help="number of dataloader workers",
-                                 #default=12
-                                 default=0
+                                 # default=12
+                                 default=4
                                  )
 
         # LOADING options
@@ -207,6 +207,8 @@ class MonodepthOptions:
                                  action="store_true")
         # opitions for GPUs
         self.parser.add_argument("--local_rank", type=int, default=-1)
+        self.parser.add_argument("--distributed", help="use DistributedDataParallel",
+                                 action="store_true")
 
 
     def parse(self):

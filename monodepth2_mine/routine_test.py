@@ -9,3 +9,7 @@ optimizer_dict = torch.load(optimizer_load_path,map_location=device)
 print('learning rate is ',optimizer_dict['param_groups'][0]['lr'])
 a=torch.Tensor([1,3,5,7])
 print(a>2)
+b=6
+c=6
+b/=c-1
+print(b)
