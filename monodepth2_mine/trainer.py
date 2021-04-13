@@ -37,11 +37,8 @@ class Trainer:
         assert self.opt.width % 32 == 0, "'width' must be a multiple of 32"
 
         self.models = {}
-        #added for GPUs
         self.models_GPUs = {}
         self.parameters_to_train = []
-        # FLAGS = parser.parse_args()
-        # local_rank = FLAGS.local_rank
         if self.opt.distributed:
             torch.cuda.set_device(self.opt.local_rank)
             torch.distributed.init_process_group(backend="nccl")
@@ -215,25 +212,15 @@ class Trainer:
             self.ssim.to(self.device)
 
         self.backproject_depth = {}
-        # self.backproject_depth_GPUs = {}
         self.project_3d = {}
-        # self.project_3d_GPUs = {}
         for scale in self.opt.scales:
             h = self.opt.height // (2 ** scale)
             w = self.opt.width // (2 ** scale)
 
             self.backproject_depth[scale] = BackprojectDepth(self.opt.batch_size, h, w)
             self.backproject_depth[scale].to(self.device)
-            # self.backproject_depth_GPUs[scale] = torch.nn.parallel.DistributedDataParallel(self.backproject_depth[scale],
-            #                                                                      device_ids=[self.opt.local_rank],
-            #                                                                      output_device=self.opt.local_rank)
-
             self.project_3d[scale] = Project3D(self.opt.batch_size, h, w)
             self.project_3d[scale].to(self.device)
-            # self.project_3d_GPUs[scale] = torch.nn.parallel.DistributedDataParallel(
-            #     self.project_3d[scale],
-            #     device_ids=[self.opt.local_rank],
-            #     output_device=self.opt.local_rank)
         self.depth_metric_names = [
             "de/abs_rel", "de/sq_rel", "de/rms", "de/log_rms", "da/a1", "da/a2", "da/a3"]
 
