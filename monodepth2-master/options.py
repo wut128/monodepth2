@@ -21,10 +21,10 @@ class MonodepthOptions:
                                  type=str,
                                  help="path to the training data",
                                  # for local PC, use thr following location
-                                 # default=os.path.join('/home/yihang/DataSets/Kitti', "kitti_data"))
+                                 default=os.path.join('/home/yihang/DataSets/Kitti', "kitti_data"))
                                  # for servers, use the following instead
-                                 default =os.path.join('/home/wt/Datasets/Kitti', "kitti_data"))
-                                # default=os.path.join(file_dir, "kitti_data"))
+                                 # default =os.path.join('/home/wt/Datasets/Kitti', "kitti_data"))
+                                 # default=os.path.join(file_dir, "kitti_data"))
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
@@ -144,8 +144,8 @@ class MonodepthOptions:
         self.parser.add_argument("--num_workers",
                                  type=int,
                                  help="number of dataloader workers",
-                                 #default=12
-                                 default=0
+                                 # default=12
+                                 default=2
                                  )
 
         # LOADING options
