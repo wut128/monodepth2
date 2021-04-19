@@ -21,14 +21,14 @@ class MonodepthOptions:
                                  type=str,
                                  help="path to the training data",
                                  # for local PC, use thr following location
-                                 default=os.path.join('/home/yihang/DataSets/Yhbox', "YihangData"))
+                                 default=os.path.join('/home/yihang/DataSets/Yhbox', "YihangData960_400_12HZ"))
                                  # for servers, use the following instead
                                  # default =os.path.join('/home/wt/Datasets/Kitti', "kitti_data"))
                                  # default=os.path.join(file_dir, "kitti_data"))
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default=os.path.join(os.path.expanduser("~"), "tmp_ME"))
+                                 default=os.path.join(os.path.expanduser("~"), "results/HR_12HZ_0419"))
 
         # TRAINING options
         self.parser.add_argument("--model_name",
@@ -38,8 +38,8 @@ class MonodepthOptions:
         self.parser.add_argument("--split",
                                  type=str,
                                  help="which training split to use",
-                                 choices=["eigen_zhou", "eigen_full", "odom", "benchmark", "eigen_wu"],
-                                 default="eigen_wu")
+                                 choices=["eigen_zhou", "eigen_full", "odom", "benchmark", "eigen_wu","eigen_wu_12HZ"],
+                                 default="eigen_wu_12HZ")
         self.parser.add_argument("--num_layers",
                                  type=int,
                                  help="number of resnet layers",
@@ -85,25 +85,25 @@ class MonodepthOptions:
                                  nargs="+",
                                  type=int,
                                  help="frames to load",
-                                 default=[0, -1, 1])
+                                 default=[0, -1, 1])# can be changed to[0,-2,2]
 
         # OPTIMIZATION options
         self.parser.add_argument("--batch_size",
                                  type=int,
                                  help="batch size",
-                                 default=10)
+                                 default=5)
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",
-                                 default=1e-4)
+                                 default=1e-5)
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
-                                 default=20)
+                                 default=10)
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
                                  help="step size of the scheduler",
-                                 default=10)
+                                 default=15)
 
         # ABLATION options
         self.parser.add_argument("--v1_multiscale",
@@ -145,7 +145,7 @@ class MonodepthOptions:
                                  type=int,
                                  help="number of dataloader workers",
                                  # default=12
-                                 default=1
+                                 default=2
                                  )
 
         # LOADING options
@@ -157,6 +157,9 @@ class MonodepthOptions:
                                  type=str,
                                  help="models to load",
                                  default=["encoder", "depth", "pose_encoder", "pose"])
+        self.parser.add_argument("--load_optimizer",
+                                 help="if load optimizer state_dict",
+                                 action="store_true")
 
         # LOGGING options
         self.parser.add_argument("--log_frequency",

@@ -46,7 +46,7 @@ def parse_args():
     parser.add_argument("--no_cuda",
                         help='if set, disables CUDA',
                         action='store_true')
-    parser.add_argument("--load_weights_folder", type=str,
+    parser.add_argument("--load_model", type=str,
                         help='pass to load a pretrained weights')
 
     return parser.parse_args()
@@ -65,7 +65,7 @@ def test_simple(args):
 
     #download_model_if_doesnt_exist(args.model_name)
     #model_path = os.path.join("models", args.model_name)
-    model_path = os.path.expanduser(args.load_weights_folder)
+    model_path = os.path.expanduser(args.load_model)
     print("-> Loading model from ", model_path)
     encoder_path = os.path.join(model_path, "encoder.pth")
     depth_decoder_path = os.path.join(model_path, "depth.pth")
@@ -84,7 +84,7 @@ def test_simple(args):
     encoder.eval()
 
     print("   Loading pretrained decoder")
-    depth_decoder = networks.DepthDecoder(
+    depth_decoder = networks.HRDepthDecoder(
         num_ch_enc=encoder.num_ch_enc, scales=range(4))
 
     loaded_dict = torch.load(depth_decoder_path, map_location=device)
@@ -144,7 +144,7 @@ def test_simple(args):
             colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
             im = pil.fromarray(colormapped_im)
 
-            name_dest_im = os.path.join(output_directory, "{}_disp.jpeg".format(output_name))
+            name_dest_im = os.path.join(output_directory, "{}_disp4.jpeg".format(output_name))
             im.save(name_dest_im)
 
             print("   Processed {:d} of {:d} images - saved prediction to {}".format(

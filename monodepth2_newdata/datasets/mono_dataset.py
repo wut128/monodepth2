@@ -98,8 +98,8 @@ class MonoDataset(data.Dataset):
         for k in list(inputs):
             frame = inputs[k]
             # crop the original image to (800, 1920), 800 is the height
-            crop_obj = transforms.CenterCrop((800, 1920))
-            inputs[k] = crop_obj(inputs[k])
+            # crop_obj = transforms.CenterCrop((800, 1920))
+            # inputs[k] = crop_obj(inputs[k])
             if "color" in k:
                 n, im, i = k
                 for i in range(self.num_scales):
@@ -161,8 +161,8 @@ class MonoDataset(data.Dataset):
             # if i == "s":
             #     other_side = {"r": "l", "l": "r"}[side]
             #     inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
-            # else:
-                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i, do_flip)
+            # else: #for 12HZ, the frame bias is i*2
+                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i*2, do_flip)
 
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):
