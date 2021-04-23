@@ -449,6 +449,13 @@ class Trainer:
                 else:
                     # save both images, and do min all at once below
                     identity_reprojection_loss = identity_reprojection_losses
+                # do the further masking to prevent very small identity_loss due to light intensity change
+                if self.opt.further_masking:
+                    loss_max = torch.max(identity_reprojection_loss)
+                    zero = torch.zeros_like(identity_reprojection_loss)
+                    identity_reprojection_loss = torch.where(identity_reprojection_loss > loss_max*self.opt.masking_ratio,
+                                                             identity_reprojection_loss, zero)
+
 
             elif self.opt.predictive_mask:
                 # use the predicted mask

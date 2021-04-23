@@ -26,12 +26,13 @@ class KITTIDataset(MonoDataset):
         #                    [0, 1.92, 0.5, 0],
         #                    [0, 0, 1, 0],
         #                    [0, 0, 0, 1]], dtype=np.float32)
+        # The followings shouuld be the croppped parameters
         self.K = np.array([[1.05, 0, 0.51, 0],
-                           [0, 1.60, 0.51, 0],
+                           [0, 1.60, 0.57, 0],
                            [0, 0, 1, 0],
                            [0, 0, 0, 1]], dtype=np.float32)
 
-        self.full_res_shape = (1920, 1280)
+        self.full_res_shape = (960, 400)
         self.side_map = {"2": 2, "3": 3, "l": 2, "r": 3}
 
     def check_depth(self):

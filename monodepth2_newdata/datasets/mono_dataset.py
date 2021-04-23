@@ -161,7 +161,7 @@ class MonoDataset(data.Dataset):
             # if i == "s":
             #     other_side = {"r": "l", "l": "r"}[side]
             #     inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
-            # else: #for 12HZ, the frame bias is i*2
+            # else: #for 12HZ, the frame offset is i*2
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index + i*2, do_flip)
 
         # adjusting intrinsics to match each scale in the pyramid

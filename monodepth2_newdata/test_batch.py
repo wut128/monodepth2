@@ -99,12 +99,9 @@ def test_simple(args):
         paths = [args.image_path]
         output_directory = os.path.dirname(args.image_path)
     elif os.path.isdir(args.image_path):
-        output_directory = os.path.join(args.image_path,'test_result')
-        if not os.path.exists(output_directory):
-            os.makedirs(output_directory)
         # Searching folder for images
         paths = glob.glob(os.path.join(args.image_path, '*.{}'.format(args.ext)))
-
+        output_directory = args.image_path
     else:
         raise Exception("Can not find args.image_path: {}".format(args.image_path))
 
@@ -147,7 +144,7 @@ def test_simple(args):
             colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
             im = pil.fromarray(colormapped_im)
 
-            if len(paths) > 1:
+            if len(paths)>1:
                 name_dest_im = os.path.join(output_directory, "{}_disp_batch.jpeg".format(output_name))
             else:
                 name_dest_im = os.path.join(output_directory, "{}_disp5.jpeg".format(output_name))

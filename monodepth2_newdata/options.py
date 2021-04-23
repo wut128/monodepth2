@@ -28,7 +28,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default=os.path.join(os.path.expanduser("~"), "results/HR_12HZ_0419"))
+                                 default=os.path.join(os.path.expanduser("~"), "results/HR_12HZ_0419_2"))
 
         # TRAINING options
         self.parser.add_argument("--model_name",
@@ -95,7 +95,7 @@ class MonodepthOptions:
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",
-                                 default=1e-5)
+                                 default=3e-6)
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
@@ -136,6 +136,13 @@ class MonodepthOptions:
                                  help="normal or shared",
                                  default="separate_resnet",
                                  choices=["posecnn", "separate_resnet", "shared"])
+        self.parser.add_argument("--further_masking",
+                                 help="if set, do the further masking",
+                                 action="store_true")
+        self.parser.add_argument("--masking_ratio",
+                                 type=float,
+                                 help="the ratio to compare loss in further_masking",
+                                 default=0.01)
 
         # SYSTEM options
         self.parser.add_argument("--no_cuda",
