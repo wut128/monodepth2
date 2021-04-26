@@ -99,7 +99,7 @@ def test_simple(args):
         paths = [args.image_path]
         output_directory = os.path.dirname(args.image_path)
     elif os.path.isdir(args.image_path):
-        output_directory = os.path.join(args.image_path,'test_result')
+        output_directory = os.path.join(args.image_path,'test_result_integ')
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
         # Searching folder for images
@@ -150,7 +150,7 @@ def test_simple(args):
             if len(paths) > 1:
                 name_dest_im = os.path.join(output_directory, "{}_disp_batch.jpeg".format(output_name))
             else:
-                name_dest_im = os.path.join(output_directory, "{}_disp5.jpeg".format(output_name))
+                name_dest_im = os.path.join(output_directory, "{}_disp7.jpeg".format(output_name))
             im.save(name_dest_im)
 
             print("   Processed {:d} of {:d} images - saved prediction to {}".format(

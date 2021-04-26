@@ -381,12 +381,13 @@ class Trainer:
                 # transform to 3D using depth info
                 cam_points = self.backproject_depth[source_scale](
                     depth, inputs[("inv_K", source_scale)])
-               #  transform 3d to 2D using depth and T
+               #  transform 3d to 2D using depth and T, pix_coords is in[-1,1]
                 pix_coords = self.project_3d[source_scale](
                     cam_points, inputs[("K", source_scale)], T)
 
                 outputs[("sample", frame_id, scale)] = pix_coords
-                # outputs["sample"] is the transformed coordiantes for each input scale
+                # outputs["sample"] is the transformed coordinates for each input scale
+                # outputs[("color",1,scale)] is the predicted image for frame_id=1
                 outputs[("color", frame_id, scale)] = F.grid_sample(
                     inputs[("color", frame_id, source_scale)],
                     outputs[("sample", frame_id, scale)],

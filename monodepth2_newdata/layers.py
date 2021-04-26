@@ -161,6 +161,7 @@ class BackprojectDepth(nn.Module):
                                        requires_grad=False)
 
     def forward(self, depth, inv_K):
+        # inv_K from dataloader, the first dimension is batch_size
         cam_points = torch.matmul(inv_K[:, :3, :3], self.pix_coords)
         # recover 3d data, unrelated to extrinsic matrix
         cam_points = depth.view(self.batch_size, 1, -1) * cam_points
