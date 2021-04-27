@@ -99,7 +99,7 @@ def test_simple(args):
         paths = [args.image_path]
         output_directory = os.path.dirname(args.image_path)
     elif os.path.isdir(args.image_path):
-        output_directory = os.path.join(args.image_path,'test_result_integ')
+        output_directory = os.path.join(args.image_path,'result_HR')
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
         # Searching folder for images

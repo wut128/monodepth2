@@ -452,10 +452,19 @@ class Trainer:
                     identity_reprojection_loss = identity_reprojection_losses
                 # do the further masking to prevent very small identity_loss due to light intensity change
                 if self.opt.further_masking:
+                    # do the min first
+                    identity_reprojection_loss, _ = torch.min(identity_reprojection_loss, dim=1, keepdim=True)
+                    # mask the maximum part of after-min identity_loss
                     loss_max = torch.max(identity_reprojection_loss)
+                    loss_min = torch.min(identity_reprojection_loss)
                     zero = torch.zeros_like(identity_reprojection_loss)
-                    identity_reprojection_loss = torch.where(identity_reprojection_loss > loss_max*self.opt.masking_ratio,
-                                                             identity_reprojection_loss, zero)
+                    identity_reprojection_loss = torch.where(
+                        identity_reprojection_loss > loss_min + (loss_max - loss_min) * (1 - self.opt.masking_ratio),
+                        zero, identity_reprojection_loss)
+                    # mask the minimum part of after-min identity_loss
+                    identity_reprojection_loss = torch.where(
+                        identity_reprojection_loss < loss_min + (loss_max - loss_min) * self.opt.masking_ratio,
+                        zero, identity_reprojection_loss)
 
 
             elif self.opt.predictive_mask:
