@@ -84,8 +84,12 @@ def test_simple(args):
     encoder.eval()
 
     print("   Loading pretrained decoder")
+    # Load the HR version
     depth_decoder = networks.HRDepthDecoder(
         num_ch_enc=encoder.num_ch_enc, scales=range(4))
+    # load the original version
+    # depth_decoder = networks.DepthDecoder(
+    #     num_ch_enc=encoder.num_ch_enc, scales=range(4))
 
     loaded_dict = torch.load(depth_decoder_path, map_location=device)
     depth_decoder.load_state_dict(loaded_dict)
@@ -93,13 +97,14 @@ def test_simple(args):
     depth_decoder.to(device)
     depth_decoder.eval()
 
+    result_folder = "result_0430"
     # FINDING INPUT IMAGES
     if os.path.isfile(args.image_path):
         # Only testing on a single image
         paths = [args.image_path]
         output_directory = os.path.dirname(args.image_path)
     elif os.path.isdir(args.image_path):
-        output_directory = os.path.join(args.image_path,'result_HR')
+        output_directory = os.path.join(args.image_path,result_folder)
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
         # Searching folder for images
@@ -148,9 +153,12 @@ def test_simple(args):
             im = pil.fromarray(colormapped_im)
 
             if len(paths) > 1:
-                name_dest_im = os.path.join(output_directory, "{}_disp_batch.jpeg".format(output_name))
+                name_dest_im = os.path.join(output_directory, "{}_{}.jpeg".format(output_name,result_folder))
             else:
-                name_dest_im = os.path.join(output_directory, "{}_disp7.jpeg".format(output_name))
+                # output_directory = os.path.join(output_directory, 'weight_0')
+                if not os.path.exists(output_directory):
+                    os.makedirs(output_directory)
+                name_dest_im = os.path.join(output_directory, "{}_0507_3.jpeg".format(output_name))
             im.save(name_dest_im)
 
             print("   Processed {:d} of {:d} images - saved prediction to {}".format(

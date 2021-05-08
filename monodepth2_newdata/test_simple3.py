@@ -55,10 +55,6 @@ def parse_args():
     parser.add_argument("--integrate",
                         help='if set, integrate the pred_depth',
                         action='store_true')
-    parser.add_argument("--filter_ratio",
-                        type=float,
-                        help="the ratio to keep the predicted depth",
-                        default=0.7)
 
 
     return parser.parse_args()
@@ -141,15 +137,14 @@ def test_simple(args):
     # pose_decoder.to(device)
     pose_decoder.eval()
 
-    result_folder = "result_0427_1"
+
     # FINDING INPUT IMAGES
     if os.path.isfile(args.image_path):
         # Only testing on a single image
         paths = [args.image_path]
         output_directory = os.path.dirname(args.image_path)
     elif os.path.isdir(args.image_path):
-
-        output_directory = os.path.join(args.image_path,result_folder)
+        output_directory = os.path.join(args.image_path,'test_result')
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
         # Searching folder for images
@@ -159,23 +154,10 @@ def test_simple(args):
         raise Exception("Can not find args.image_path: {}".format(args.image_path))
 
     print("-> Predicting on {:d} test images".format(len(paths)))
-    number_num=[]
-    paths_new = []
-    # order the image number in paths
-    for idx, image_p in enumerate(paths):
-        base_name = os.path.basename(image_p)
-        base_name = os.path.splitext(base_name)
-        number_num.append(int(base_name[0]))
-
-    # sort_num = np.array(number_num)
-    number_num.sort()
-    # ind = np.argsort(np.argsort(sort_num))
-    for index, name in enumerate(number_num):
-        paths_new.append(os.path.join(args.image_path, '{:010d}.{}'.format(name,args.ext)))
+    outputs=[]
     # PREDICTING ON EACH IMAGE IN TURN
     with torch.no_grad():
-        for idx, image_path in enumerate(paths_new):
-            outputs = []
+        for idx, image_path in enumerate(paths):
 
             if image_path.endswith("_disp.jpg"):
                 # don't try to predict disparity for a disparity image!
@@ -183,8 +165,6 @@ def test_simple(args):
             output_name = os.path.splitext(os.path.basename(image_path))[0]
             folder_name = os.path.dirname(image_path)
             source_path = os.path.join(folder_name,"{:010d}.jpg".format(int(output_name)-2))
-            if not os.path.isfile(source_path):
-                continue
             # Load image and preprocess
             input_image = pil.open(image_path).convert('RGB')
             source_image = pil.open(source_path).convert('RGB')
@@ -213,82 +193,26 @@ def test_simple(args):
             disp=[]
             disp.append(source_output[("disp", 0)])
             disp.append(target_output[("disp", 0)])
+            disp_resized = torch.nn.functional.interpolate(
+                disp[1], (original_height, original_width), mode="bilinear", align_corners=False)
+
+            # Saving numpy file
+            output_name = os.path.splitext(os.path.basename(image_path))[0]
+            name_dest_npy = os.path.join(output_directory, "{}_disp.npy".format(output_name))
+            scaled_disp, depth = disp_to_depth(disp[1], 0.1, 100)
+            np.save(name_dest_npy, scaled_disp.cpu().numpy())
 
             # calculate the transform matrix
-            npy_path = os.path.join(output_directory, "{:010d}_disp.npy".format(int(output_name)-2))
-            if os.path.exists(npy_path):
-                loadData = np.load(npy_path)
-                disp_source = torch.from_numpy(loadData)
-            else:
-                disp_source = disp[0]
-            # print("the dimension of disp[0] is",disp_source.shape)
-            scaled_disp_source, depth_source = disp_to_depth(disp_source, 0.1, 100)
-
+            _, depth_source = disp_to_depth(disp[0], 0.1, 100)
             back_project = BackprojectDepth(1, feed_height, feed_width)
             cam_points = back_project(depth_source, inv_K)
             project_3d = Project3D(1, feed_height, feed_width)
             pix_coords = project_3d(cam_points, K, T)
+            # pred_image = F.grid_sample(
+            #     source_image,pix_coords,
+            #     padding_mode="border", align_corners=True)
 
-            # calculate the depth from predicted image
-            # pred_image = pred_image.to(device)
-            if not args.simple_mode:
-                pred_image = F.grid_sample(
-                    source_image, pix_coords,
-                    padding_mode="border", align_corners=True)
-                features = encoder(pred_image)
-                output_pred = depth_decoder(features)
-                disp_pred = output_pred[("disp", 0)]
-            else:
-                disp_pred = F.grid_sample(
-                    disp_source, pix_coords,
-                    padding_mode="border", align_corners=True)
-            # scaled_disp_pred, depth_pred = disp_to_depth(disp_pred , 0.1, 100)
-            disp_pred_resized = torch.nn.functional.interpolate(
-                    disp_pred, (original_height, original_width), mode="bilinear", align_corners=False)
 
-            # save and draw depth from predicted image
-            disp_resized_np_source = disp_pred_resized.squeeze().cpu().numpy()
-            vmax = np.percentile(disp_resized_np_source, 95)
-            normalizer = mpl.colors.Normalize(vmin=disp_resized_np_source.min(), vmax=vmax)
-            mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
-            colormapped_im = (mapper.to_rgba(disp_resized_np_source)[:, :, :3] * 255).astype(np.uint8)
-            im = pil.fromarray(colormapped_im)
-            if len(paths) > 1:
-                name_dest_im = os.path.join(output_directory, "{}_disp_pred_batch.jpeg".format(output_name))
-            elif not args.simple_mode:
-                name_dest_im = os.path.join(output_directory, "{}_disp5_pred.jpeg".format(output_name))
-            else:
-                name_dest_im = os.path.join(output_directory, "{}_disp5_pred_simple.jpeg".format(output_name))
-            # save the predicted depth image
-            # im.save(name_dest_im)
-
-            # Saving numpy file
-            # output_name = os.path.splitext(os.path.basename(image_path))[0]
-            name_dest_npy = os.path.join(output_directory, "{}_disp.npy".format(output_name))
-            # scaled_disp, depth = disp_to_depth(disp[1], 0.1, 100)
-            # The output of depth decoder is saved
-            if args.integrate:
-                # filter_ratio is used rather than adaptive filtering
-                # disp_f = torch.where(disp[1] > disp_pred,disp[1],
-                #                     disp[1]*(1-args.filter_ratio)+disp_pred*args.filter_ratio)
-                # adaptive filtering
-
-                # disp_f = torch.where(disp[1] > disp_pred,disp[1],
-                #                     disp[1]*torch.clamp(disp_pred+0.4,0,1)+disp_pred*torch.clamp(1-disp_pred-0.4,0,1))
-                # disp_f = torch.where(disp[1] > disp_pred, disp[1],
-                #                      disp[1] * torch.clamp(torch.tanh(disp_pred-0.4)*0.3 + disp_pred + 0.4, 0, 1) + disp_pred * torch.clamp(
-                #                          1 - torch.tanh(disp_pred-0.4)*0.3 - disp_pred - 0.4, 0, 1))
-                # when disp_pred=0, ratio for disp_pred is 0.75, when disp_pred is 0.55 ratio is 0
-                disp_f = torch.where(disp[1] > disp_pred, disp[1],
-                                     disp[1] * torch.clamp(torch.tanh(disp_pred-0.4)*0.4 + disp_pred + 0.4, 0, 1) + disp_pred * torch.clamp(
-                                         1 - torch.tanh(disp_pred-0.4)*0.4 - disp_pred - 0.4, 0, 1))
-            else:
-                disp_f = disp[1]
-            np.save(name_dest_npy, disp_f.cpu().numpy())
-
-            # process the target image of final result
-            disp_resized = torch.nn.functional.interpolate(
-                disp_f, (original_height, original_width), mode="bilinear", align_corners=False)
             # Saving colormapped depth image
             disp_resized_np = disp_resized.squeeze().cpu().numpy()
             vmax = np.percentile(disp_resized_np, 95)
@@ -298,16 +222,45 @@ def test_simple(args):
             im = pil.fromarray(colormapped_im)
 
             if len(paths) > 1:
-                name_dest_im = os.path.join(output_directory, "{}_{}.jpeg".format(output_name, result_folder))
+                name_dest_im = os.path.join(output_directory, "{}_disp_batch.jpeg".format(output_name))
             else:
                 name_dest_im = os.path.join(output_directory, "{}_disp5.jpeg".format(output_name))
             im.save(name_dest_im)
 
             print("   Processed {:d} of {:d} images - saved prediction to {}".format(
                 idx + 1, len(paths), name_dest_im))
+            # calculate the depth from predicted image
+            # pred_image = pred_image.to(device)
+            if not args.simple_mode:
+                pred_image = F.grid_sample(
+                    source_image, pix_coords,
+                    padding_mode="border", align_corners=True)
+                features = encoder(pred_image)
+                output_pred = depth_decoder(features)
+                depth_pred = output_pred[("disp", 0)]
+            else:
+                depth_pred = F.grid_sample(
+                    disp[0], pix_coords,
+                    padding_mode="border", align_corners=True)
+            disp_pred_resized = torch.nn.functional.interpolate(
+                    depth_pred, (original_height, original_width), mode="bilinear", align_corners=False)
+
+            # save and draw depth from predicted image
+            disp_resized_np = disp_pred_resized.squeeze().cpu().numpy()
+            vmax = np.percentile(disp_resized_np, 95)
+            normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
+            mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
+            colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
+            im = pil.fromarray(colormapped_im)
+            if len(paths) > 1:
+                name_dest_im = os.path.join(output_directory, "{}_disp_pred_batch.jpeg".format(output_name))
+            elif not args.simple_mode:
+                name_dest_im = os.path.join(output_directory, "{}_disp5_pred.jpeg".format(output_name))
+            else:
+                name_dest_im = os.path.join(output_directory, "{}_disp5_pred_simple.jpeg".format(output_name))
+            im.save(name_dest_im)
 
     print('-> Done!')
-
 
 
 if __name__ == '__main__':

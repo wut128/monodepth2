@@ -458,13 +458,13 @@ class Trainer:
                     loss_max = torch.max(identity_reprojection_loss)
                     loss_min = torch.min(identity_reprojection_loss)
                     zero = torch.zeros_like(identity_reprojection_loss)
-                    identity_reprojection_loss = torch.where(
-                        identity_reprojection_loss > loss_min + (loss_max - loss_min) * (1 - self.opt.masking_ratio),
-                        zero, identity_reprojection_loss)
+                    # identity_reprojection_loss = torch.where(
+                    #     identity_reprojection_loss > loss_min + (loss_max - loss_min) * (1 - self.opt.masking_ratio),
+                    #     zero, identity_reprojection_loss)
                     # mask the minimum part of after-min identity_loss
-                    identity_reprojection_loss = torch.where(
-                        identity_reprojection_loss < loss_min + (loss_max - loss_min) * self.opt.masking_ratio,
-                        zero, identity_reprojection_loss)
+                    # identity_reprojection_loss = torch.where(
+                    #     identity_reprojection_loss < loss_min + (loss_max - loss_min) * self.opt.masking_ratio,
+                    #     zero, identity_reprojection_loss)
 
 
             elif self.opt.predictive_mask:
@@ -485,24 +485,30 @@ class Trainer:
                 reprojection_loss = reprojection_losses.mean(1, keepdim=True)
             else:
                 reprojection_loss = reprojection_losses
+            if self.opt.further_masking:
+                reprojection_loss, _ = torch.min(reprojection_loss, dim=1, keepdim=True)
 
-            if not self.opt.disable_automasking:
-                # add random numbers to break ties
-                identity_reprojection_loss += torch.randn(
-                    identity_reprojection_loss.shape).cuda() * 0.00001
+            if not self.opt.further_masking:
+                if not self.opt.disable_automasking:
+                    # add random numbers to break ties
+                    identity_reprojection_loss += torch.randn(
+                        identity_reprojection_loss.shape).cuda() * 0.00001
 
-                combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
+                    combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
+                else:
+                    combined = reprojection_loss
+
+                if combined.shape[1] == 1:
+                    to_optimise = combined
+                else:
+                    to_optimise, idxs = torch.min(combined, dim=1)
+
+                if not self.opt.disable_automasking:
+                    outputs["identity_selection/{}".format(scale)] = (
+                        idxs > identity_reprojection_loss.shape[1] - 1).float()
             else:
-                combined = reprojection_loss
+                to_optimise = torch.where(reprojection_loss < identity_reprojection_loss, reprojection_loss, zero)
 
-            if combined.shape[1] == 1:
-                to_optimise = combined
-            else:
-                to_optimise, idxs = torch.min(combined, dim=1)
-
-            if not self.opt.disable_automasking:
-                outputs["identity_selection/{}".format(scale)] = (
-                    idxs > identity_reprojection_loss.shape[1] - 1).float()
 
             loss += to_optimise.mean()
 

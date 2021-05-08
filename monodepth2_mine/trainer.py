@@ -276,7 +276,7 @@ class Trainer:
     def run_epoch(self):
         """Run a single epoch of training and validation
         """
-        #self.model_lr_scheduler.step()
+        # self.model_lr_scheduler.step()
 
         print("Training")
         self.set_train()
